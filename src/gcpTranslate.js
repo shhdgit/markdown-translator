@@ -3,8 +3,9 @@ import { TranslationServiceClient } from "@google-cloud/translate";
 // Instantiates a client
 const translationClient = new TranslationServiceClient();
 
-const projectId = "docs-349708";
-const location = "global";
+const projectId = process.env.PROJECT_ID || "";
+const location = "us-central1";
+const glossaryId = process.env.GLOSSARY_ID || "";
 // const text = "Hello, world!";
 // const textList = ["Hello, world!", "This is a test app."];
 
@@ -14,6 +15,9 @@ export async function translateText(
   srcLang = "en",
   targetLang = "ja"
 ) {
+  const glossaryConfig = {
+    glossary: `projects/${projectId}/locations/${location}/glossaries/${glossaryId}`,
+  };
   // Construct request
   const request = {
     parent: `projects/${projectId}/locations/${location}`,
@@ -22,7 +26,8 @@ export async function translateText(
     sourceLanguageCode: srcLang,
     targetLanguageCode: targetLang,
   };
-  console.log(">>>gcp translate>>>", ...contents);
+  glossaryId && (request.glossaryConfig = glossaryConfig);
+  console.log(`>>>gcp translate ${glossaryId}>>>`, ...contents);
   // Run request
   const [response] = await translationClient.translateText(request);
 
