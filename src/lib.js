@@ -85,6 +85,8 @@ export const handleAstNode = (node) => {
     case "tableCell":
       return handleParagraph(node);
       break;
+    case "html":
+      return handleHTML(node);
     default:
       // console.log(node);
       break;
@@ -136,6 +138,14 @@ export const handleAstNode = (node) => {
 
 // }
 
+const handleHTML = async (htmlNode) => {
+  const HTMLStr = htmlNode.value;
+  if (!HTMLStr.includes(`<span translate="no">`)) {
+    const [output] = await translateSingleText(HTMLStr, "text/html");
+    htmlNode.value = output;
+  }
+};
+
 const handleParagraph = async (paragraphNode) => {
   // TODO: handle linkReference
   const metadata = await paragraphIntegratePlaceholder(paragraphNode.children);
@@ -145,7 +155,7 @@ const handleParagraph = async (paragraphNode) => {
   const HTMLStr = updateHTMLNoTransStr(trimParagraphHtml);
   const [output] = await translateSingleText(HTMLStr, "text/html");
   // console.log(translatedHTMLStr);
-  const translatedHTMLStr = undoUpdateHTMLNoTransStr(output);
+  const translatedHTMLStr = undoUpdateHTMLNoTransStr(inlineHtml2mdStr(output));
   const translatedHTMLStrWithBr = updateBrTag(translatedHTMLStr);
   const newChildren = retriveByPlaceholder(translatedHTMLStrWithBr, metadata);
   paragraphNode.children = newChildren;
@@ -178,24 +188,9 @@ const paragraphIntegratePlaceholder = async (children) => {
         meta[idx] = linkchildCopy;
         break;
       case "linkReference":
-      // const linkRefchildCopy = _.cloneDeep(child);
-      // child.type = "html";
-      // child.value = generateNoTranslateTag(idx);
-      // meta[idx] = linkRefchildCopy;
-      // break;
       case "inlineCode":
-      // const inlineCodechildCopy = _.cloneDeep(child);
-      // child.type = "html";
-      // child.value = generateNoTranslateTag(idx);
-      // meta[idx] = inlineCodechildCopy;
-      // break;
       case "image":
       case "imageReference":
-      // const imageChildCopy = _.cloneDeep(child);
-      // child.type = "html";
-      // child.value = generateNoTranslateTag(idx);
-      // meta[idx] = imageChildCopy;
-      // break;
       case "footnote":
       case "footnoteReference":
         const nodeChildCopy = _.cloneDeep(child);
@@ -310,6 +305,8 @@ const trimHtmlTags = (htmlStr) => {
     .trim()
     .replace(/^<[^>]+>/, "")
     .replace(/<\/[^>]+>$/, "")
+    .replace(`<p>`, ``)
+    .replace(`</p>`, ``)
     .trim();
 };
 
@@ -322,7 +319,9 @@ const inlineHtml2mdStr = (HTMLStr = "") => {
     .replace(`<em>`, `*`)
     .replace(`</em>`, `*`)
     .replace(`<del>`, `~~`)
-    .replace(`</del>`, `~~`);
+    .replace(`</del>`, `~~`)
+    .replace(`<p>`, ``)
+    .replace(`</p>`, ``);
 };
 
 const updateHTMLNoTransStr = (HTMLStr) => {

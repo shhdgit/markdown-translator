@@ -50,5 +50,12 @@ export async function translateSingleText(
     console.log(">>>gcp **NO** translate >>> ", ...contents);
     return [contents];
   }
+  if (
+    contents.startsWith(`{{< copyable`) ||
+    contents.startsWith(`{{&#x3C; copyable`)
+  ) {
+    console.log(">>>gcp **NO** translate >>> ", ...contents);
+    return [`{{< copyable "" >}}`];
+  }
   return translateText([contents], mimeType, srcLang, targetLang);
 }
