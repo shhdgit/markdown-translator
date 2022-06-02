@@ -34,7 +34,13 @@ export async function translateText(
   // for (const translation of response.translations) {
   //   console.log(`Translation: ${translation.translatedText}`);
   // }
-  return response.translations.map((data) => `${data.translatedText}`);
+  // for (const translation of response.glossaryTranslations) {
+  //   console.log(`glossaryTranslation: ${translation.translatedText}`);
+  // }
+  // console.log(responseß);
+  return glossaryId
+    ? response.glossaryTranslations.map((data) => `${data.translatedText}`)
+    : response.translations.map((data) => `${data.translatedText}`);
 }
 
 export async function translateSingleText(
@@ -57,5 +63,5 @@ export async function translateSingleText(
     console.log(">>>gcp **NO** translate >>> ", ...contents);
     return [`{{< copyable "" >}}`];
   }
-  return translateText([contents], mimeType, srcLang, targetLang);
+  return translateText([contents.trim()], mimeType, srcLang, targetLang);
 }
