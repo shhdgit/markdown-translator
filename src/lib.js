@@ -88,8 +88,8 @@ export const handleAstNode = (node) => {
     case "html":
       return handleHTML(node);
     case "yaml":
-      // frontmatter
-      return handleFrontMatter(node);
+      // TODO: frontmatter
+      // return handleFrontMatter(node);
     default:
       // console.log(node);
       break;
