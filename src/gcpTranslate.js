@@ -28,19 +28,24 @@ export async function translateText(
   };
   glossaryId && (request.glossaryConfig = glossaryConfig);
   console.log(`>>>gcp translate ${glossaryId}>>>`, ...contents);
-  // Run request
-  const [response] = await translationClient.translateText(request);
+  try {
+    // Run request
+    const [response] = await translationClient.translateText(request);
 
-  // for (const translation of response.translations) {
-  //   console.log(`Translation: ${translation.translatedText}`);
-  // }
-  // for (const translation of response.glossaryTranslations) {
-  //   console.log(`glossaryTranslation: ${translation.translatedText}`);
-  // }
-  // console.log(responseß);
-  return glossaryId
-    ? response.glossaryTranslations.map((data) => `${data.translatedText}`)
-    : response.translations.map((data) => `${data.translatedText}`);
+    // for (const translation of response.translations) {
+    //   console.log(`Translation: ${translation.translatedText}`);
+    // }
+    // for (const translation of response.glossaryTranslations) {
+    //   console.log(`glossaryTranslation: ${translation.translatedText}`);
+    // }
+    // console.log(responseß);
+    return glossaryId
+      ? response.glossaryTranslations.map((data) => `${data.translatedText}`)
+      : response.translations.map((data) => `${data.translatedText}`);
+  } catch (error) {
+    console.error(error);
+    return contents;
+  }
 }
 
 export async function translateSingleText(
