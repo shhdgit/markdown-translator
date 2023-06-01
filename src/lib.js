@@ -327,27 +327,24 @@ const astNode2mdStr = (astNode) => {
 const trimHtmlTags = (htmlStr) => {
   // src: <h1>TiDB Experimental Features <em>a</em> <strong>b</strong> ~~c~~ <code>d</code> 123456 </h1>
   // result: TiDB Experimental Features <em>a</em> <strong>b</strong> ~~c~~ <code>d</code> 123456
-  return htmlStr
-    .trim()
-    .replace(/^<[^>]+>/, "")
-    .replace(/<\/[^>]+>$/, "")
-    .replace(`<p>`, ``)
-    .replace(`</p>`, ``)
-    .trim();
+  const originHtmlStr = htmlStr.trim();
+  const htmlStrWithoutPInHead = originHtmlStr.replace(/^<p>/, "").replace(/<\/p>$/, "");
+  const htmlStrWithoutHInHead = htmlStrWithoutPInHead.replace(/^<h\d>/, "").replace(/<\/h\d>$/, "");
+  return htmlStrWithoutHInHead.trim();
 };
 
 const inlineHtml2mdStr = (HTMLStr = "") => {
   // type PhrasingContent = Text | Emphasis | Strong | Delete | InlineCode | Break
-  return HTMLStr.replace(`<strong>`, `**`)
-    .replace(`</strong>`, `**`)
-    .replace(`<code>`, "`")
-    .replace(`</code>`, "`")
-    .replace(`<em>`, `*`)
-    .replace(`</em>`, `*`)
-    .replace(`<del>`, `~~`)
-    .replace(`</del>`, `~~`)
-    .replace(`<p>`, ``)
-    .replace(`</p>`, ``);
+  return HTMLStr.replaceAll(`<strong>`, `**`)
+    .replaceAll(`</strong>`, `**`)
+    .replaceAll(`<code>`, "`")
+    .replaceAll(`</code>`, "`")
+    .replaceAll(`<em>`, `*`)
+    .replaceAll(`</em>`, `*`)
+    .replaceAll(`<del>`, `~~`)
+    .replaceAll(`</del>`, `~~`)
+    .replaceAll(`<p>`, ``)
+    .replaceAll(`</p>`, ``);
 };
 
 const updateHTMLNoTransStr = (HTMLStr) => {
