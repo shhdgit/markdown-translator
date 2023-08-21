@@ -87,8 +87,6 @@ export const handleAstNode = (node) => {
       break;
     case 'html':
       return handleHTML(node);
-    case 'mdxJsxFlowElement':
-      return handleMDX(node);
     case 'yaml':
     // TODO: frontmatter
     // return handleFrontMatter(node);
@@ -173,10 +171,6 @@ const handleHTML = async (htmlNode) => {
     htmlNode.value = output;
   }
 };
-
-const handleMDX = async (mdxNode) => {
-  mdxNode.children.forEach(handleAstNode)
-}
 
 const handleParagraph = async (paragraphNode) => {
   // TODO: handle linkReference
