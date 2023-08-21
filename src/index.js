@@ -7,6 +7,7 @@ import {
   frontmatterFromMarkdown,
   frontmatterToMarkdown,
 } from "mdast-util-frontmatter";
+import { mdxjs } from "micromark-extension-mdxjs";
 import { mdxFromMarkdown, mdxToMarkdown } from "mdast-util-mdx";
 // import { gfmTable } from "micromark-extension-gfm-table";
 // import { gfmTableFromMarkdown, gfmTableToMarkdown } from "mdast-util-gfm-table";
@@ -25,7 +26,7 @@ const translateSingleMdToJa = async (filePath) => {
   const mdFileContent = fs.readFileSync(filePath);
   const mdAst = fromMarkdown(mdFileContent, {
     // extensions: [frontmatter(["yaml", "toml"]), gfmTable, gfm()],
-    extensions: [frontmatter(["yaml", "toml"]), gfm()],
+    extensions: [frontmatter(["yaml", "toml"]), gfm(), mdxjs()],
     mdastExtensions: [
       mdxFromMarkdown(),
       frontmatterFromMarkdown(["yaml", "toml"]),
