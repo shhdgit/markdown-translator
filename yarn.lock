@@ -2435,10 +2435,10 @@ rehype-stringify@^9.0.3:
     hast-util-to-html "^8.0.0"
     unified "^10.0.0"
 
-remark-comment@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/remark-comment/-/remark-comment-1.0.0.tgz#befe2fd5dde688d641542cd1206130e00b79a337"
-  integrity sha512-k8YPo5MGvl8l4gGxOH6Zk4Fa2AhDACN5eqKnKZcHDORZQS15hlnezlBHj2lqyDiqzApNmYOMTibkEJbMSKU25w==
+remark-comment-o@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/remark-comment-o/-/remark-comment-o-1.0.1.tgz#82e282175a88e857eff60d2122d15787224c26af"
+  integrity sha512-c4LTOmck1KVKc5gy0C8L04VIn+R8dQUSS3R2CT/eNHxK3x0S9ldPvIybqymRxdFDCVIIunFwqrZ8ApmEyXyH/Q==
   dependencies:
     micromark-factory-space "^1.0.0"
     micromark-util-character "^1.1.0"

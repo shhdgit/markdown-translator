@@ -18,7 +18,7 @@ import {
   comment,
   commentFromMarkdown,
   commentToMarkdown,
-} from "remark-comment";
+} from "remark-comment-o";
 
 import { getMdFileList, writeFileSync, handleAstNode } from "./lib.js";
 
