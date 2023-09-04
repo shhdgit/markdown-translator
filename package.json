@@ -25,7 +25,7 @@
     "micromark-extension-mdxjs": "^2.0.0",
     "rehype-raw": "^6.1.1",
     "rehype-stringify": "^9.0.3",
-    "remark-comment": "^1.0.0",
+    "remark-comment-o": "^1.0.1",
     "remark-html": "^15.0.1",
     "remark-parse": "^10.0.1",
     "remark-rehype": "^10.1.0",
