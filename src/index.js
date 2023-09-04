@@ -75,6 +75,12 @@ const translateSingleMdToJa = async (filePath) => {
   writeFileSync(`output/${filePath}`, result);
 };
 
+const copyable = /{{< copyable\s+(.+)\s+>}}\r?\n/g;
+const replaceDeprecatedContent = (path) => {
+  const mdFileContent = fs.readFileSync(path).toString();
+  fs.writeFileSync(path, mdFileContent.replace(copyable, ""));
+};
+
 // root
 // paragraph
 // heading
@@ -109,6 +115,7 @@ const main = async () => {
 
   for (let a of srcList) {
     console.log(a);
+    replaceDeprecatedContent(a);
     await translateSingleMdToJa(a);
     // break;
   }
