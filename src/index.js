@@ -14,6 +14,11 @@ import { mdxFromMarkdown, mdxToMarkdown } from "mdast-util-mdx";
 import { gfm } from "micromark-extension-gfm";
 import { gfmFromMarkdown, gfmToMarkdown } from "mdast-util-gfm";
 import { visit } from "unist-util-visit";
+import {
+  comment,
+  commentFromMarkdown,
+  commentToMarkdown,
+} from "remark-comment";
 
 import { getMdFileList, writeFileSync, handleAstNode } from "./lib.js";
 
@@ -26,12 +31,13 @@ const translateSingleMdToJa = async (filePath) => {
   const mdFileContent = fs.readFileSync(filePath);
   const mdAst = fromMarkdown(mdFileContent, {
     // extensions: [frontmatter(["yaml", "toml"]), gfmTable, gfm()],
-    extensions: [frontmatter(["yaml", "toml"]), gfm(), mdxjs()],
+    extensions: [frontmatter(["yaml", "toml"]), gfm(), mdxjs(), comment],
     mdastExtensions: [
       mdxFromMarkdown(),
       frontmatterFromMarkdown(["yaml", "toml"]),
       // gfmTableFromMarkdown,
       gfmFromMarkdown(),
+      commentFromMarkdown(),
     ],
   });
 
@@ -69,6 +75,7 @@ const translateSingleMdToJa = async (filePath) => {
       frontmatterToMarkdown(["yaml", "toml"]),
       // gfmTableToMarkdown(),
       gfmToMarkdown(),
+      commentToMarkdown,
     ],
   });
   const result = newFile.replaceAll(/(#+.+)(\\{)(#.+})/g, `$1{$3`);
