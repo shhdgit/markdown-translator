@@ -1,35 +1,35 @@
-import * as fs from 'fs';
-import _ from 'lodash';
-import path from 'path';
-import glob from 'glob';
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkRehype from 'remark-rehype';
-import remarkHtml from 'remark-html';
-import rehypeRaw from 'rehype-raw';
+import * as fs from "fs";
+import _ from "lodash";
+import path from "path";
+import glob from "glob";
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import remarkHtml from "remark-html";
+import rehypeRaw from "rehype-raw";
 
-import { toHast } from 'mdast-util-to-hast';
-import rehypeStringify from 'rehype-stringify';
+import { toHast } from "mdast-util-to-hast";
+import rehypeStringify from "rehype-stringify";
 
-import { mdxFromMarkdown, mdxToMarkdown } from 'mdast-util-mdx';
+// import { mdxFromMarkdown, mdxToMarkdown } from 'mdast-util-mdx';
 import {
   frontmatterFromMarkdown,
   frontmatterToMarkdown,
-} from 'mdast-util-frontmatter';
-import { gfmTableFromMarkdown, gfmTableToMarkdown } from 'mdast-util-gfm-table';
-import { gfm } from 'micromark-extension-gfm';
-import { gfmFromMarkdown, gfmToMarkdown } from 'mdast-util-gfm';
+} from "mdast-util-frontmatter";
+import { gfmTableFromMarkdown, gfmTableToMarkdown } from "mdast-util-gfm-table";
+import { gfm } from "micromark-extension-gfm";
+import { gfmFromMarkdown, gfmToMarkdown } from "mdast-util-gfm";
 
-import { toMarkdown } from 'mdast-util-to-markdown';
+import { toMarkdown } from "mdast-util-to-markdown";
 
-import { translateSingleText } from './gcpTranslate.js';
+import { translateSingleText } from "./gcpTranslate.js";
 
 const generateNoTranslateTag = (src) => {
   return `<span translate="no">{{B-NOTRANSLATE-${src}-NOTRANSLATE-E}}</span>`;
 };
 
 const getMds = (src) => {
-  return glob.sync(src + '/**/*.md');
+  return glob.sync(src + "/**/*.md");
 };
 
 export const getMdFileList = (prefix) => {
@@ -76,18 +76,18 @@ export const writeFileSync = (destPath, fileContent) => {
 
 export const handleAstNode = (node) => {
   switch (node.type) {
-    case 'heading':
+    case "heading":
       return handleHeadings(node);
       break;
-    case 'paragraph':
+    case "paragraph":
       return handleParagraph(node);
       break;
-    case 'tableCell':
+    case "tableCell":
       return handleParagraph(node);
       break;
-    case 'html':
+    case "html":
       return handleHTML(node);
-    case 'yaml':
+    case "yaml":
     // TODO: frontmatter
     // return handleFrontMatter(node);
     default:
@@ -143,31 +143,31 @@ export const handleAstNode = (node) => {
 
 const handleFrontMatter = async (yamlNode) => {
   const originVal = yamlNode.value;
-  const originValList = originVal.split('\n');
+  const originValList = originVal.split("\n");
   console.log(originValList);
   const result = [];
   for (let i = 0; i < originValList.length; i++) {
     const frontmatterItem = originValList[i];
-    const keyName = frontmatterItem.split(':').shift();
-    if (keyName === 'title') {
-      const itemVal = frontmatterItem.split('title:').pop();
+    const keyName = frontmatterItem.split(":").shift();
+    if (keyName === "title") {
+      const itemVal = frontmatterItem.split("title:").pop();
       const translatedVal = await translateSingleText(itemVal);
       result.push(`title: ${translatedVal}`);
-    } else if (keyName === 'summary') {
-      const itemVal = frontmatterItem.split('summary:').pop();
+    } else if (keyName === "summary") {
+      const itemVal = frontmatterItem.split("summary:").pop();
       const translatedVal = await translateSingleText(itemVal);
       result.push(`summary: ${translatedVal}`);
     } else {
       result.push(frontmatterItem);
     }
   }
-  yamlNode.value = result.join('\n');
+  yamlNode.value = result.join("\n");
 };
 
 const handleHTML = async (htmlNode) => {
   const HTMLStr = htmlNode.value;
   if (!HTMLStr.includes(`<span translate="no">`)) {
-    const [output] = await translateSingleText(HTMLStr, 'text/html');
+    const [output] = await translateSingleText(HTMLStr, "text/html");
     htmlNode.value = output;
   }
 };
@@ -179,7 +179,7 @@ const handleParagraph = async (paragraphNode) => {
   const paragraphHtml = await mdSnippet2html(paragraphNode);
   const trimParagraphHtml = trimHtmlTags(paragraphHtml);
   const HTMLStr = updateHTMLNoTransStr(trimParagraphHtml);
-  const [output] = await translateSingleText(HTMLStr, 'text/html');
+  const [output] = await translateSingleText(HTMLStr, "text/html");
   // console.log(translatedHTMLStr);
   const translatedHTMLStr = undoUpdateHTMLNoTransStr(inlineHtml2mdStr(output));
   const translatedHTMLStrWithBr = updateBrTag(translatedHTMLStr);
@@ -193,7 +193,7 @@ const paragraphIntegratePlaceholder = async (children) => {
   for (let idx = 0; idx < children.length; idx++) {
     const child = children[idx];
     switch (child.type) {
-      case 'link':
+      case "link":
         const linkchildCopy = _.cloneDeep(child);
         const linkHtml = await mdSnippet2html(child);
         const linkHtmlStr = trimHtmlTags(linkHtml);
@@ -203,24 +203,24 @@ const paragraphIntegratePlaceholder = async (children) => {
         )[2];
         const [linkHtmlStrInside] = await translateSingleText(
           trimHtmlTags(linkHtmlStr),
-          'text/html'
+          "text/html"
         );
-        child.type = 'html';
+        child.type = "html";
         child.value = generateNoTranslateTag(idx);
-        linkchildCopy.type = 'html';
+        linkchildCopy.type = "html";
         linkchildCopy.value = `[${inlineHtml2mdStr(
           linkHtmlStrInside
         )}](${hrefValue})`;
         meta[idx] = linkchildCopy;
         break;
-      case 'linkReference':
-      case 'inlineCode':
-      case 'image':
-      case 'imageReference':
-      case 'footnote':
-      case 'footnoteReference':
+      case "linkReference":
+      case "inlineCode":
+      case "image":
+      case "imageReference":
+      case "footnote":
+      case "footnoteReference":
         const nodeChildCopy = _.cloneDeep(child);
-        child.type = 'html';
+        child.type = "html";
         child.value = generateNoTranslateTag(idx);
         meta[idx] = nodeChildCopy;
         break;
@@ -233,9 +233,9 @@ const paragraphIntegratePlaceholder = async (children) => {
 
 const retriveByPlaceholder = (resultStr, meta) => {
   return resultStr.split(/({{B-|-E}})/g).reduce((prev, item) => {
-    if (item.startsWith('{{B-') || item.endsWith('-E}}')) return prev;
-    if (item.startsWith('PLACEHOLDER-') && item.endsWith('-PLACEHOLDER')) {
-      const originIdx = parseInt(item.replace(/(PLACEHOLDER|-)/g, ''));
+    if (item.startsWith("{{B-") || item.endsWith("-E}}")) return prev;
+    if (item.startsWith("PLACEHOLDER-") && item.endsWith("-PLACEHOLDER")) {
+      const originIdx = parseInt(item.replace(/(PLACEHOLDER|-)/g, ""));
       const originItem = meta[originIdx];
       switch (originItem.type) {
         default:
@@ -244,7 +244,7 @@ const retriveByPlaceholder = (resultStr, meta) => {
       }
     } else {
       prev.push({
-        type: 'html',
+        type: "html",
         value: item,
       });
     }
@@ -256,7 +256,7 @@ const enStr2AnchorFormat = (headingStr) => {
   // trim spaces and transform characters to lower case
   const text = headingStr.trim().toLowerCase();
   // \W is the negation of shorthand \w for [A-Za-z0-9_] word characters (including the underscore)
-  const result = text.replace(/[\W_]+/g, '-').replace(/^-+|-+$/g, '');
+  const result = text.replace(/[\W_]+/g, "-").replace(/^-+|-+$/g, "");
   return result;
 };
 
@@ -286,10 +286,10 @@ const concatHeadingCustomId = async (headingNode) => {
 const handleHeadings = async (node) => {
   await headingTextExactCustomId(node);
   const HTMLStr = node.HTMLStr;
-  const [translatedHTMLStr] = await translateSingleText(HTMLStr, 'text/html');
+  const [translatedHTMLStr] = await translateSingleText(HTMLStr, "text/html");
   node.children = [
     {
-      type: 'html',
+      type: "html",
       value: translatedHTMLStr,
     },
   ];
@@ -312,10 +312,9 @@ const mdSnippet2html = async (mdNode) => {
 
 const astNode2mdStr = (astNode) => {
   const result = toMarkdown(astNode, {
-    bullet: '-',
+    bullet: "-",
     extensions: [
-      mdxToMarkdown(),
-      frontmatterToMarkdown(['yaml', 'toml']),
+      frontmatterToMarkdown(["yaml", "toml"]),
       // gfmTableToMarkdown(),
       gfmToMarkdown(),
     ],
@@ -328,24 +327,24 @@ const trimHtmlTags = (htmlStr) => {
   // src: <h1>TiDB Experimental Features <em>a</em> <strong>b</strong> ~~c~~ <code>d</code> 123456 </h1>
   // result: TiDB Experimental Features <em>a</em> <strong>b</strong> ~~c~~ <code>d</code> 123456
   const originHtmlStr = htmlStr.trim();
-  if (originHtmlStr.startsWith('<li>')) {
+  if (originHtmlStr.startsWith("<li>")) {
     return originHtmlStr;
   }
   const htmlStrWithoutTags = originHtmlStr
-    .replace(/^<[^>]+>/, '')
-    .replace(/<\/[^>]+>$/, '')
+    .replace(/^<[^>]+>/, "")
+    .replace(/<\/[^>]+>$/, "")
     .replace(`<p>`, ``)
     .replace(`</p>`, ``)
     .trim();
   return htmlStrWithoutTags;
 };
 
-const inlineHtml2mdStr = (HTMLStr = '') => {
+const inlineHtml2mdStr = (HTMLStr = "") => {
   // type PhrasingContent = Text | Emphasis | Strong | Delete | InlineCode | Break
   return HTMLStr.replaceAll(`<strong>`, `**`)
     .replaceAll(`</strong>`, `**`)
-    .replaceAll(`<code>`, '`')
-    .replaceAll(`</code>`, '`')
+    .replaceAll(`<code>`, "`")
+    .replaceAll(`</code>`, "`")
     .replaceAll(`<em>`, `*`)
     .replaceAll(`</em>`, `*`)
     .replaceAll(`<del>`, `~~`)

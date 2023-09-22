@@ -7,18 +7,18 @@ import {
   frontmatterFromMarkdown,
   frontmatterToMarkdown,
 } from "mdast-util-frontmatter";
-import { mdxjs } from "micromark-extension-mdxjs";
-import { mdxFromMarkdown, mdxToMarkdown } from "mdast-util-mdx";
+// import { mdxjs } from "micromark-extension-mdxjs";
+// import { mdxFromMarkdown, mdxToMarkdown } from "mdast-util-mdx";
 // import { gfmTable } from "micromark-extension-gfm-table";
 // import { gfmTableFromMarkdown, gfmTableToMarkdown } from "mdast-util-gfm-table";
 import { gfm } from "micromark-extension-gfm";
 import { gfmFromMarkdown, gfmToMarkdown } from "mdast-util-gfm";
 import { visit } from "unist-util-visit";
-import {
-  comment,
-  commentFromMarkdown,
-  commentToMarkdown,
-} from "remark-comment-o";
+// import {
+//   comment,
+//   commentFromMarkdown,
+//   commentToMarkdown,
+// } from "remark-comment-o";
 
 import { getMdFileList, writeFileSync, handleAstNode } from "./lib.js";
 
@@ -31,13 +31,11 @@ const translateSingleMdToJa = async (filePath) => {
   const mdFileContent = fs.readFileSync(filePath);
   const mdAst = fromMarkdown(mdFileContent, {
     // extensions: [frontmatter(["yaml", "toml"]), gfmTable, gfm()],
-    extensions: [frontmatter(["yaml", "toml"]), gfm(), mdxjs(), comment],
+    extensions: [frontmatter(["yaml", "toml"]), gfm()],
     mdastExtensions: [
-      mdxFromMarkdown(),
       frontmatterFromMarkdown(["yaml", "toml"]),
       // gfmTableFromMarkdown,
       gfmFromMarkdown(),
-      commentFromMarkdown(),
     ],
   });
 
@@ -71,11 +69,9 @@ const translateSingleMdToJa = async (filePath) => {
   const newFile = toMarkdown(mdAst, {
     bullet: "-",
     extensions: [
-      mdxToMarkdown(),
       frontmatterToMarkdown(["yaml", "toml"]),
       // gfmTableToMarkdown(),
       gfmToMarkdown(),
-      commentToMarkdown,
     ],
   });
   const result = newFile.replaceAll(/(#+.+)(\\{)(#.+})/g, `$1{$3`);
