@@ -21,7 +21,7 @@ export const translateSingleMdToJa = async (filePath) => {
   if (!data.output) {
     throw new Error(`No output, response data: ${JSON.stringify(data)}`);
   }
-  const result = concatHeadings(data.output, headings);
+  const result = concatHeadings(data.output.trim(), headings);
   writeFileSync(`output/${filePath}`, result);
 };
 
