@@ -1,6 +1,8 @@
 import * as fs from "fs";
 import "dotenv/config";
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 export const translateSingleMdToJa = async (filePath) => {
   const mdFileContent = fs.readFileSync(filePath).toString();
   const headings = extractHeadings(mdFileContent);
@@ -22,7 +24,7 @@ export const translateSingleMdToJa = async (filePath) => {
     throw new Error(`No output, response data: ${JSON.stringify(data)}`);
   }
   const result = concatHeadings(data.output.trim(), headings);
-  writeFileSync(`output/${filePath}`, result);
+  fs.writeFileSync(`output/${filePath}`, result);
 };
 
 // # Heading 1
