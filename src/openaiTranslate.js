@@ -35,7 +35,7 @@ const LANGLINK_HEADERS = {
 const GPT35_APP_ID = "24fcccc8-f4a1-4e01-bc67-098398296613";
 const OUTPUT_NODE_ID = "uXt40e3y1KhhHEKW-gmSN";
 const TIKTOKEN_ENCODING = "cl100k_base";
-const MAX_TOKEN = 2000;
+const MAX_TOKEN = 1900;
 const RETRY_INTERVAL = 5000;
 const RETRY_TIME = 60;
 
@@ -83,7 +83,9 @@ const getLangLinkResult = async (id) => {
     }
   );
   const data = await res.json();
-  console.log(data);
+  if (res.status !== 200) {
+    throw new Error(data);
+  }
   return data.debug;
 };
 
