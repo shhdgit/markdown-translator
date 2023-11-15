@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import "dotenv/config";
 import { get_encoding } from "tiktoken";
-import { writeFileSync } from "./lib";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -17,6 +16,17 @@ export const translateSingleMdToJa = async (filePath) => {
   const contentWithMeta = `${meta}\n${result}`;
 
   writeFileSync(`output/${filePath}`, contentWithMeta);
+};
+
+const writeFileSync = (destPath, fileContent) => {
+  const dir = path.dirname(destPath);
+
+  if (!fs.existsSync(dir)) {
+    // console.info(`Create empty dir: ${dir}`);
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(destPath, fileContent);
 };
 
 const metaReg = /---\s*\n/;
