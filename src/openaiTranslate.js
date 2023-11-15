@@ -9,7 +9,7 @@ export const translateSingleMdToJa = async (filePath) => {
   const mdFileContent = fs.readFileSync(filePath).toString();
   const [meta, content] = splitMetaContent(mdFileContent);
   const headings = extractHeadings(content);
-  const contentSegments = preserveLineBreak(binarySplitByToken(content));
+  const contentSegments = preserveLineBreak(headingSplit(content));
 
   const dataArr = await Promise.all(contentSegments.map(runLangLinkTranslator));
   const data = dataArr.join("\n").trim();
@@ -48,12 +48,13 @@ const GPT35_APP_ID = "24fcccc8-f4a1-4e01-bc67-098398296613";
 const OUTPUT_NODE_ID = "uXt40e3y1KhhHEKW-gmSN";
 const TIKTOKEN_ENCODING = "cl100k_base";
 const MAX_TOKEN = 1024;
+// const RERUN_TIME = 3
 const RETRY_INTERVAL = 5000;
-const RETRY_TIME = 60;
+const RETRY_TIME = 12;
 
 const runLangLinkTranslator = async (input) => {
-  if (input === "") {
-    return Promise.resolve("");
+  if (input === "" || input === "\n") {
+    return Promise.resolve(input);
   }
 
   const res = await fetch(
@@ -101,22 +102,47 @@ const getLangLinkResult = async (id) => {
   return data.debug;
 };
 
-const binarySplitByToken = (text, separator = "\n") => {
+const headingSplitReg = /(?=^#{1,6}\s.+$)/gm;
+
+const headingSplit = (text) =>
+  binarySplitByToken(text, headingSplitReg, "", breakLineSplit);
+
+const breakLineSplit = (text) => binarySplitByToken(text, "\n", "\n");
+
+const binarySplitByToken = (
+  text,
+  splitSeparator,
+  joinSeparator,
+  largeParagraphCallback
+) => {
   const enc = get_encoding(TIKTOKEN_ENCODING);
   const numTokens = enc.encode(text).length;
   if (numTokens < MAX_TOKEN) {
     return [text];
   }
 
-  const textArr = text.split(separator);
+  const textArr = text.split(splitSeparator);
   if (textArr.filter((t) => !!t).length < 2) {
+    if (largeParagraphCallback) {
+      return largeParagraphCallback(text);
+    }
     throw new Error(`Too large paragraph. Content: ${text}`);
   }
 
   const pivot = Math.floor(textArr.length / 2);
   return [
-    ...binarySplitByToken(textArr.slice(0, pivot).join(separator)),
-    ...binarySplitByToken(textArr.slice(pivot).join(separator)),
+    ...binarySplitByToken(
+      textArr.slice(0, pivot).join(joinSeparator),
+      splitSeparator,
+      joinSeparator,
+      largeParagraphCallback
+    ),
+    ...binarySplitByToken(
+      textArr.slice(pivot).join(joinSeparator),
+      splitSeparator,
+      joinSeparator,
+      largeParagraphCallback
+    ),
   ];
 };
 
