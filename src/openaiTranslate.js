@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import path from "path";
 import "dotenv/config";
 import { get_encoding } from "tiktoken";
 
