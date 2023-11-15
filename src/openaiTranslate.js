@@ -1,31 +1,113 @@
 import * as fs from "fs";
 import "dotenv/config";
+import { get_encoding } from "tiktoken";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 export const translateSingleMdToJa = async (filePath) => {
   const mdFileContent = fs.readFileSync(filePath).toString();
-  const headings = extractHeadings(mdFileContent);
+  const [meta, content] = splitMetaContent(mdFileContent);
+  const headings = extractHeadings(content);
+  const contentSegments = preserveLineBreak(binarySplitByToken(content));
+
+  const dataArr = await Promise.all(contentSegments.map(runLangLinkTranslator));
+  const data = dataArr.join("\n").trim();
+  const result = concatHeadings(data, headings);
+  const contentWithMeta = `${meta}\n${result}`;
+
+  fs.writeFileSync(`output/${filePath}`, contentWithMeta);
+};
+
+const metaReg = /---\s*\n/;
+
+const splitMetaContent = (originalText) => {
+  const [_, meta, content] = originalText.split(metaReg);
+  return [`---\n${meta}---\n`, content];
+};
+
+const LANGLINK_HEADERS = {
+  "Content-Type": "application/json",
+  "x-langlink-access-key": process.env.LANGLINK_ACCESS_KEY,
+  "x-langlink-access-secret": process.env.LANGLINK_ACCESS_SECRET,
+  "x-langlink-user": process.env.LANGLINK_USER,
+};
+
+const GPT35_APP_ID = "24fcccc8-f4a1-4e01-bc67-098398296613";
+const OUTPUT_NODE_ID = "uXt40e3y1KhhHEKW-gmSN";
+const TIKTOKEN_ENCODING = "cl100k_base";
+const MAX_TOKEN = 2000;
+const RETRY_INTERVAL = 5000;
+const RETRY_TIME = 60;
+
+const runLangLinkTranslator = async (input) => {
+  if (input === "") {
+    return Promise.resolve("");
+  }
+
   const res = await fetch(
-    "https://langlink.pingcap.net/langlink-api/applications/2ab16937-ef06-42b1-a2ea-c46f645c5d98",
+    `https://langlink.pingcap.net/langlink-api/applications/${GPT35_APP_ID}/async`,
     {
       method: "POST",
-      body: JSON.stringify({ input: mdFileContent }),
-      headers: {
-        "Content-Type": "application/json",
-        "x-langlink-access-key": process.env.LANGLINK_ACCESS_KEY,
-        "x-langlink-access-secret": process.env.LANGLINK_ACCESS_SECRET,
-        "x-langlink-user": process.env.LANGLINK_USER,
-      },
+      body: JSON.stringify({ input }),
+      headers: LANGLINK_HEADERS,
     }
   );
   const data = await res.json();
-  if (!data.output) {
-    throw new Error(`No output, response data: ${JSON.stringify(data)}`);
-  }
-  const result = concatHeadings(data.output.trim(), headings);
-  fs.writeFileSync(`output/${filePath}`, result);
+  const retryPromise = new Promise((resolve, reject) => {
+    const getLangLinkResultLoop = async (retryTime = 0) => {
+      const result = await getLangLinkResult(data.id);
+      if (!result.length) {
+        if (retryTime < RETRY_TIME) {
+          setTimeout(() => {
+            getLangLinkResultLoop(++retryTime);
+          }, RETRY_INTERVAL);
+        } else {
+          reject(new Error(`Maximum retry attempts reached: ${RETRY_TIME}.`));
+        }
+        return;
+      }
+      resolve(result.find((node) => node.block === OUTPUT_NODE_ID).output);
+    };
+    getLangLinkResultLoop();
+  });
+
+  return retryPromise;
 };
+
+const getLangLinkResult = async (id) => {
+  const res = await fetch(
+    `https://langlink.pingcap.net/langlink-api/applications/${GPT35_APP_ID}/debug/${id}`,
+    {
+      method: "GET",
+      headers: LANGLINK_HEADERS,
+    }
+  );
+  const data = await res.json();
+  return data.debug;
+};
+
+const binarySplitByToken = (text, separator = "\n") => {
+  const enc = get_encoding(TIKTOKEN_ENCODING);
+  const numTokens = enc.encode(text).length;
+  if (numTokens < MAX_TOKEN) {
+    return [text];
+  }
+
+  const textArr = text.split(separator);
+  if (textArr.filter((t) => !!t).length < 2) {
+    throw new Error(`Too large paragraph. Content: ${text}`);
+  }
+
+  const pivot = Math.floor(textArr.length / 2);
+  return [
+    ...binarySplitByToken(textArr.slice(0, pivot).join(separator)),
+    ...binarySplitByToken(textArr.slice(pivot).join(separator)),
+  ];
+};
+
+// \n\nabc\nbcd\n -> ['', '', 'abc\nbcd', ''].join('\n')
+const preserveLineBreak = (contentSegments) =>
+  contentSegments.map((seg) => seg.split(/^\n+|\n+$/g)).flat();
 
 // # Heading 1
 // ## Heading 2

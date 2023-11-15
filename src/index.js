@@ -117,12 +117,13 @@ const main = async () => {
   const srcList = getMdFileList("markdowns");
   // console.log(srcList);
 
-  for (let a of srcList) {
-    console.log(a);
-    replaceDeprecatedContent(a);
-    await translateSingleMdToJa(a);
-    // break;
-  }
+  await Promise.all(
+    srcList.map((filePath) => {
+      console.log(filePath);
+      replaceDeprecatedContent(filePath);
+      return translateSingleMdToJa(filePath);
+    })
+  );
 
   // console.log(pSum);
 };
