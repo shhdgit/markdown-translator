@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import "dotenv/config";
 import { get_encoding } from "tiktoken";
+import { writeFileSync } from "./lib";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -15,7 +16,7 @@ export const translateSingleMdToJa = async (filePath) => {
   const result = concatHeadings(data, headings);
   const contentWithMeta = `${meta}\n${result}`;
 
-  fs.writeFileSync(`output/${filePath}`, contentWithMeta);
+  writeFileSync(`output/${filePath}`, contentWithMeta);
 };
 
 const metaReg = /---\s*\n/;
