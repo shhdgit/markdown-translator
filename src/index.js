@@ -21,62 +21,63 @@ import { visit } from "unist-util-visit";
 // } from "remark-comment-o";
 
 import { getMdFileList, writeFileSync, handleAstNode } from "./lib.js";
+import { translateSingleMdToJa } from "./openaiTranslate.js";
 
 const pSum = {
   sum: 0,
   _data: [],
 };
 
-const translateSingleMdToJa = async (filePath) => {
-  const mdFileContent = fs.readFileSync(filePath);
-  const mdAst = fromMarkdown(mdFileContent, {
-    // extensions: [frontmatter(["yaml", "toml"]), gfmTable, gfm()],
-    extensions: [frontmatter(["yaml", "toml"]), gfm()],
-    mdastExtensions: [
-      frontmatterFromMarkdown(["yaml", "toml"]),
-      // gfmTableFromMarkdown,
-      gfmFromMarkdown(),
-    ],
-  });
+// const translateSingleMdToJa = async (filePath) => {
+//   const mdFileContent = fs.readFileSync(filePath);
+//   const mdAst = fromMarkdown(mdFileContent, {
+//     // extensions: [frontmatter(["yaml", "toml"]), gfmTable, gfm()],
+//     extensions: [frontmatter(["yaml", "toml"]), gfm()],
+//     mdastExtensions: [
+//       frontmatterFromMarkdown(["yaml", "toml"]),
+//       // gfmTableFromMarkdown,
+//       gfmFromMarkdown(),
+//     ],
+//   });
 
-  const treeNodes = [];
-  visit(mdAst, (node) => {
-    treeNodes.push(node);
-  });
+//   const treeNodes = [];
+//   visit(mdAst, (node) => {
+//     treeNodes.push(node);
+//   });
 
-  // treeNodes.forEach((node) => {
-  //   if (node.type === "paragraph") {
-  //     pSum.sum = pSum.sum + 1;
-  //     const children = node.children;
-  //     children?.forEach((c) => {
-  //       const type = c.type;
-  //       pSum[type] = pSum[type] ? pSum[type] + 1 : 1;
-  //       if (type === "linkReference") pSum._data.push(node);
-  //     });
-  //   }
-  // });
+//   // treeNodes.forEach((node) => {
+//   //   if (node.type === "paragraph") {
+//   //     pSum.sum = pSum.sum + 1;
+//   //     const children = node.children;
+//   //     children?.forEach((c) => {
+//   //       const type = c.type;
+//   //       pSum[type] = pSum[type] ? pSum[type] + 1 : 1;
+//   //       if (type === "linkReference") pSum._data.push(node);
+//   //     });
+//   //   }
+//   // });
 
-  // treeNodes.forEach((node) => {
-  //   node.type === "html" && console.log(node);
-  // });
+//   // treeNodes.forEach((node) => {
+//   //   node.type === "html" && console.log(node);
+//   // });
 
-  await Promise.all(
-    treeNodes.map(async (d) => {
-      await handleAstNode(d);
-    })
-  );
+//   await Promise.all(
+//     treeNodes.map(async (d) => {
+//       await handleAstNode(d);
+//     })
+//   );
 
-  const newFile = toMarkdown(mdAst, {
-    bullet: "-",
-    extensions: [
-      frontmatterToMarkdown(["yaml", "toml"]),
-      // gfmTableToMarkdown(),
-      gfmToMarkdown(),
-    ],
-  });
-  const result = newFile.replaceAll(/(#+.+)(\\{)(#.+})/g, `$1{$3`);
-  writeFileSync(`output/${filePath}`, result);
-};
+//   const newFile = toMarkdown(mdAst, {
+//     bullet: "-",
+//     extensions: [
+//       frontmatterToMarkdown(["yaml", "toml"]),
+//       // gfmTableToMarkdown(),
+//       gfmToMarkdown(),
+//     ],
+//   });
+//   const result = newFile.replaceAll(/(#+.+)(\\{)(#.+})/g, `$1{$3`);
+//   writeFileSync(`output/${filePath}`, result);
+// };
 
 const copyable = /{{< copyable\s+(.+)\s+>}}\r?\n/g;
 const replaceDeprecatedContent = (path) => {
@@ -116,12 +117,20 @@ const main = async () => {
   const srcList = getMdFileList("markdowns");
   // console.log(srcList);
 
-  for (let a of srcList) {
-    console.log(a);
-    replaceDeprecatedContent(a);
-    await translateSingleMdToJa(a);
+  for (let filePath of srcList) {
+    console.log(filePath);
+    replaceDeprecatedContent(filePath);
+    await translateSingleMdToJa(filePath);
     // break;
   }
+
+  // await Promise.all(
+  //   srcList.map((filePath) => {
+  //     console.log(filePath);
+  //     replaceDeprecatedContent(filePath);
+  //     return translateSingleMdToJa(filePath);
+  //   })
+  // );
 
   // console.log(pSum);
 };

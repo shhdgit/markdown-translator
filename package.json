@@ -9,6 +9,7 @@
     "@google-cloud/translate": "^6.3.1",
     "acorn": "^8.7.1",
     "aws-sdk": "^2.1123.0",
+    "dotenv": "^16.3.1",
     "fs": "^0.0.1-security",
     "glob": "^8.0.1",
     "lodash": "^4.17.21",
@@ -29,6 +30,7 @@
     "remark-html": "^15.0.1",
     "remark-parse": "^10.0.1",
     "remark-rehype": "^10.1.0",
+    "tiktoken": "^1.0.10",
     "unified": "^10.1.2",
     "unist-util-visit": "^4.1.0"
   },
