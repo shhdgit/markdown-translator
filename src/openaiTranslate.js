@@ -11,7 +11,9 @@ export const translateSingleMdToJa = async (filePath) => {
   const headings = extractHeadings(content);
   const contentSegments = preserveLineBreak(headingSplit(content));
 
-  const dataArr = await Promise.all(contentSegments.map(runLangLinkTranslator));
+  const dataArr = await Promise.all(
+    contentSegments.map(executeLangLinkTranslator)
+  );
   const data = dataArr.join("\n").trim();
   const result = concatHeadings(data, headings);
   const contentWithMeta = `${meta}\n${result}`;
@@ -48,9 +50,27 @@ const GPT35_APP_ID = "24fcccc8-f4a1-4e01-bc67-098398296613";
 const OUTPUT_NODE_ID = "uXt40e3y1KhhHEKW-gmSN";
 const TIKTOKEN_ENCODING = "cl100k_base";
 const MAX_TOKEN = 1024;
-// const RERUN_TIME = 3
+const RERUN_TIME = 3;
 const RETRY_INTERVAL = 5000;
 const RETRY_TIME = 12;
+
+const executeLangLinkTranslator = (input) => {
+  return new Promise((resolve, reject) => {
+    const rerunLoop = async (rerunTime = 0) => {
+      try {
+        const result = await runLangLinkTranslator(input);
+        resolve(result);
+      } catch {
+        if (rerunTime < RERUN_TIME) {
+          rerunLoop(++rerunTime);
+        } else {
+          reject(new Error(`Maximum rerun attempts reached: ${RERUN_TIME}.`));
+        }
+      }
+    };
+    rerunLoop();
+  });
+};
 
 const runLangLinkTranslator = async (input) => {
   if (input === "" || input === "\n") {
@@ -81,6 +101,7 @@ const runLangLinkTranslator = async (input) => {
       }
       resolve(result.find((node) => node.block === OUTPUT_NODE_ID).output);
     };
+
     getLangLinkResultLoop();
   });
 
