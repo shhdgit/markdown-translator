@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import "dotenv/config";
 
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { toMarkdown } from "mdast-util-to-markdown";
@@ -7,77 +8,167 @@ import {
   frontmatterFromMarkdown,
   frontmatterToMarkdown,
 } from "mdast-util-frontmatter";
-// import { mdxjs } from "micromark-extension-mdxjs";
-// import { mdxFromMarkdown, mdxToMarkdown } from "mdast-util-mdx";
-// import { gfmTable } from "micromark-extension-gfm-table";
-// import { gfmTableFromMarkdown, gfmTableToMarkdown } from "mdast-util-gfm-table";
 import { gfm } from "micromark-extension-gfm";
 import { gfmFromMarkdown, gfmToMarkdown } from "mdast-util-gfm";
-import { visit } from "unist-util-visit";
-// import {
-//   comment,
-//   commentFromMarkdown,
-//   commentToMarkdown,
-// } from "remark-comment-o";
+import { get_encoding } from "tiktoken";
 
-import { getMdFileList, writeFileSync, handleAstNode } from "./lib.js";
-import { translateSingleMdToJa } from "./openaiTranslate.js";
+import { getMdFileList, writeFileSync } from "./lib.js";
+import { executeLangLinkTranslator } from "./openaiTranslate.js";
 
-const pSum = {
-  sum: 0,
-  _data: [],
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+const createNewRoot = () => ({ type: "root", children: [] });
+
+const translateSingleMdToJa = async (filePath) => {
+  const mdFileContent = fs.readFileSync(filePath).toString();
+  const [meta, content] = splitMetaContent(mdFileContent);
+
+  const headings = extractHeadings(content);
+  const contentSegments = contentSplit(content, "heading")
+    .map((seg) =>
+      seg.skip
+        ? seg
+        : // preserve \n from openai output
+          // \n\nabc\nbcd\n -> ['', '', 'abc\nbcd', ''].join('\n')
+          seg.content
+            .split(/^\n+|\n+$/g)
+            .map((c) => ({ content: c, skip: !!c ? seg.skip : true }))
+    )
+    .flat();
+
+  const dataArr = await Promise.all(
+    contentSegments.map((seg) => {
+      if (seg.skip) {
+        return Promise.resolve(seg.content);
+      }
+      return executeLangLinkTranslator(seg.content);
+    })
+  );
+  const data = dataArr.join("\n").trim();
+  const result = concatHeadings(data, headings);
+  const contentWithMeta = `${meta}\n${result}`;
+
+  writeFileSync(`output/${filePath}`, contentWithMeta);
 };
 
-// const translateSingleMdToJa = async (filePath) => {
-//   const mdFileContent = fs.readFileSync(filePath);
-//   const mdAst = fromMarkdown(mdFileContent, {
-//     // extensions: [frontmatter(["yaml", "toml"]), gfmTable, gfm()],
-//     extensions: [frontmatter(["yaml", "toml"]), gfm()],
-//     mdastExtensions: [
-//       frontmatterFromMarkdown(["yaml", "toml"]),
-//       // gfmTableFromMarkdown,
-//       gfmFromMarkdown(),
-//     ],
-//   });
+const metaReg = /---\s*\n/;
 
-//   const treeNodes = [];
-//   visit(mdAst, (node) => {
-//     treeNodes.push(node);
-//   });
+const splitMetaContent = (originalText) => {
+  const [_, meta, content] = originalText.split(metaReg);
+  return [`---\n${meta}---\n`, content];
+};
 
-//   // treeNodes.forEach((node) => {
-//   //   if (node.type === "paragraph") {
-//   //     pSum.sum = pSum.sum + 1;
-//   //     const children = node.children;
-//   //     children?.forEach((c) => {
-//   //       const type = c.type;
-//   //       pSum[type] = pSum[type] ? pSum[type] + 1 : 1;
-//   //       if (type === "linkReference") pSum._data.push(node);
-//   //     });
-//   //   }
-//   // });
+const fromMarkdownContent = (content) =>
+  fromMarkdown(content, {
+    extensions: [frontmatter(["yaml", "toml"]), gfm()],
+    mdastExtensions: [
+      frontmatterFromMarkdown(["yaml", "toml"]),
+      gfmFromMarkdown(),
+    ],
+  });
 
-//   // treeNodes.forEach((node) => {
-//   //   node.type === "html" && console.log(node);
-//   // });
+const toMarkdownContent = (astNode) =>
+  toMarkdown(astNode, {
+    bullet: "-",
+    extensions: [frontmatterToMarkdown(["yaml", "toml"]), gfmToMarkdown()],
+  });
 
-//   await Promise.all(
-//     treeNodes.map(async (d) => {
-//       await handleAstNode(d);
-//     })
-//   );
+const MAX_TOKEN = 1024;
+const TIKTOKEN_ENCODING = "cl100k_base";
 
-//   const newFile = toMarkdown(mdAst, {
-//     bullet: "-",
-//     extensions: [
-//       frontmatterToMarkdown(["yaml", "toml"]),
-//       // gfmTableToMarkdown(),
-//       gfmToMarkdown(),
-//     ],
-//   });
-//   const result = newFile.replaceAll(/(#+.+)(\\{)(#.+})/g, `$1{$3`);
-//   writeFileSync(`output/${filePath}`, result);
-// };
+const createSegment = (content, skip = false) => ({ content, skip });
+const skipTypes = ["code"];
+
+const contentSplit = (content) => {
+  const enc = get_encoding(TIKTOKEN_ENCODING);
+  const numTokens = enc.encode(content).length;
+  if (numTokens < MAX_TOKEN) {
+    return [createSegment(content)];
+  }
+
+  const root = fromMarkdownContent(content);
+  const segments = [];
+  let segment = createNewRoot();
+  root.children.forEach((node) => {
+    if (skipTypes.includes(node.type)) {
+      // clear segment
+      segments.push(createSegment(toMarkdownContent(segment)));
+      segment.children = [];
+      // insert skip node into segments
+      const newRoot = createNewRoot();
+      newRoot.children.push(node);
+      segments.push(createSegment(toMarkdownContent(newRoot), true));
+      return;
+    }
+
+    const tempSeg = createNewRoot();
+    tempSeg.children = [...segment.children, node];
+    const tempContent = toMarkdownContent(tempSeg);
+    const numTokens = enc.encode(tempContent).length;
+    if (numTokens < MAX_TOKEN) {
+      segment.children.push(node);
+      return;
+    }
+
+    segments.push(createSegment(toMarkdownContent(segment)));
+    segment.children = [node];
+  });
+  segments.push(createSegment(toMarkdownContent(segment)));
+
+  return segments;
+};
+
+const extractHeadings = (content) => {
+  const root = fromMarkdown(content, {
+    extensions: [frontmatter(["yaml", "toml"]), gfm()],
+    mdastExtensions: [
+      frontmatterFromMarkdown(["yaml", "toml"]),
+      gfmFromMarkdown(),
+    ],
+  });
+  return root.children
+    .filter((node) => node.type === "heading")
+    .map((node) => ({
+      level: node.depth,
+      content: enStr2AnchorFormat(node.children[0].value),
+    }));
+};
+
+const concatHeadings = (content, headings) => {
+  const root = fromMarkdown(content, {
+    extensions: [frontmatter(["yaml", "toml"]), gfm()],
+    mdastExtensions: [
+      frontmatterFromMarkdown(["yaml", "toml"]),
+      gfmFromMarkdown(),
+    ],
+  });
+  const contentHeadings = root.children.filter(
+    (node) => node.type === "heading"
+  );
+
+  headings.forEach((heading, index) => {
+    const contentHeading = contentHeadings[index];
+    if (contentHeading.depth !== heading.level) {
+      throw new Error(
+        `The wrong level has been matched. Heading level: ${heading.level}, text: ${heading.content}; Content Heading level: ${contentHeading.depth}, text: ${contentHeading.children[0].value}`
+      );
+    }
+    contentHeading.children[0].value = `${contentHeading.children[0].value} {#${heading.content}}`;
+  });
+
+  return toMarkdown(root, {
+    bullet: "-",
+    extensions: [frontmatterToMarkdown(["yaml", "toml"]), gfmToMarkdown()],
+  });
+};
+
+const enStr2AnchorFormat = (headingStr) => {
+  // trim spaces and transform characters to lower case
+  const text = headingStr.trim().toLowerCase();
+  // \W is the negation of shorthand \w for [A-Za-z0-9_] word characters (including the underscore)
+  const result = text.replace(/[\W_]+/g, "-").replace(/^-+|-+$/g, "");
+  return result;
+};
 
 const copyable = /{{< copyable\s+(.+)\s+>}}\r?\n/g;
 const replaceDeprecatedContent = (path) => {
@@ -85,43 +176,13 @@ const replaceDeprecatedContent = (path) => {
   fs.writeFileSync(path, mdFileContent.replace(copyable, ""));
 };
 
-// root
-// paragraph
-// heading
-// thematicBreak
-// blockquote
-// list
-// listItem
-// table
-// tableRow
-// tableCell
-// html
-// code
-// yaml
-// definition
-// footnoteDefinition
-// text
-// emphasis
-// strong
-// delete
-// inlineCode
-// break
-// link
-// image
-// linkReference
-// imageReference
-// footnote
-// footnoteReference
-
 const main = async () => {
   const srcList = getMdFileList("markdowns");
-  // console.log(srcList);
 
   for (let filePath of srcList) {
     console.log(filePath);
     replaceDeprecatedContent(filePath);
     await translateSingleMdToJa(filePath);
-    // break;
   }
 
   // await Promise.all(
@@ -131,8 +192,6 @@ const main = async () => {
   //     return translateSingleMdToJa(filePath);
   //   })
   // );
-
-  // console.log(pSum);
 };
 
 main();
