@@ -73,13 +73,13 @@ const toMarkdownContent = (astNode) =>
     extensions: [frontmatterToMarkdown(["yaml", "toml"]), gfmToMarkdown()],
   });
 
-const MAX_TOKEN = 1024;
+const MAX_TOKEN = 2048;
 const TIKTOKEN_ENCODING = "cl100k_base";
 
 const createSegment = (content, skip = false) => ({ content, skip });
 const skipTypes = ["code"];
 
-const contentSplit = (content) => {
+const contentSplit = (content, by) => {
   const enc = get_encoding(TIKTOKEN_ENCODING);
   const numTokens = enc.encode(content).length;
   if (numTokens < MAX_TOKEN) {
@@ -89,11 +89,19 @@ const contentSplit = (content) => {
   const root = fromMarkdownContent(content);
   const segments = [];
   let segment = createNewRoot();
+  const pushSegmentContent = () => {
+    const segmentContent = toMarkdownContent(segment);
+    const numTokens = enc.encode(segmentContent).length;
+    if (numTokens > MAX_TOKEN) {
+      console.log(`Too large paragraph:\n${segmentContent.slice(0, 100)}...`);
+    }
+
+    segments.push(createSegment(segmentContent, numTokens > MAX_TOKEN));
+    segment.children = [];
+  };
   root.children.forEach((node) => {
     if (skipTypes.includes(node.type)) {
-      // clear segment
-      segments.push(createSegment(toMarkdownContent(segment)));
-      segment.children = [];
+      pushSegmentContent();
       // insert skip node into segments
       const newRoot = createNewRoot();
       newRoot.children.push(node);
@@ -101,31 +109,22 @@ const contentSplit = (content) => {
       return;
     }
 
-    const tempSeg = createNewRoot();
-    tempSeg.children = [...segment.children, node];
-    const tempContent = toMarkdownContent(tempSeg);
-    const numTokens = enc.encode(tempContent).length;
-    if (numTokens < MAX_TOKEN) {
-      segment.children.push(node);
-      return;
+    if (node.type === by && !!segment.children.length) {
+      pushSegmentContent();
     }
 
-    segments.push(createSegment(toMarkdownContent(segment)));
-    segment.children = [node];
+    segment.children.push(node);
   });
-  segments.push(createSegment(toMarkdownContent(segment)));
+
+  if (!!segment.children.length) {
+    pushSegmentContent();
+  }
 
   return segments;
 };
 
 const extractHeadings = (content) => {
-  const root = fromMarkdown(content, {
-    extensions: [frontmatter(["yaml", "toml"]), gfm()],
-    mdastExtensions: [
-      frontmatterFromMarkdown(["yaml", "toml"]),
-      gfmFromMarkdown(),
-    ],
-  });
+  const root = fromMarkdownContent(content);
   return root.children
     .filter((node) => node.type === "heading")
     .map((node) => ({
@@ -135,13 +134,7 @@ const extractHeadings = (content) => {
 };
 
 const concatHeadings = (content, headings) => {
-  const root = fromMarkdown(content, {
-    extensions: [frontmatter(["yaml", "toml"]), gfm()],
-    mdastExtensions: [
-      frontmatterFromMarkdown(["yaml", "toml"]),
-      gfmFromMarkdown(),
-    ],
-  });
+  const root = fromMarkdownContent(content);
   const contentHeadings = root.children.filter(
     (node) => node.type === "heading"
   );
