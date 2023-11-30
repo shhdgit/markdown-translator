@@ -55,6 +55,9 @@ const metaReg = /---\s*\n/;
 
 const splitMetaContent = (originalText) => {
   const [_, meta, content] = originalText.split(metaReg);
+  if (!meta) {
+    return [undefined, originalText];
+  }
   return [`---\n${meta}---\n`, content];
 };
 
@@ -146,7 +149,10 @@ const concatHeadings = (content, headings) => {
         `The wrong level has been matched. Heading level: ${heading.level}, text: ${heading.content}; Content Heading level: ${contentHeading.depth}, text: ${contentHeading.children[0].value}`
       );
     }
-    contentHeading.children[0].value = `${contentHeading.children[0].value} {#${heading.content}}`;
+    contentHeading.children.push({
+      type: "text",
+      value: ` {#${heading.content}}`,
+    });
   });
 
   return toMarkdown(root, {

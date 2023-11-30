@@ -5,7 +5,7 @@ const LANGLINK_HEADERS = {
   "x-langlink-user": process.env.LANGLINK_USER,
 };
 
-const GPT35_APP_ID = "daa61a60-75d1-494a-bde4-ee78d8c18803";
+const GPT35_APP_ID = "aa0b44bc-3306-427b-9349-27d33b53e255";
 const OUTPUT_NODE_ID = "uXt40e3y1KhhHEKW-gmSN";
 const RERUN_TIME = 3;
 const RETRY_INTERVAL = 5000;
