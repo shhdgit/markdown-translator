@@ -36,6 +36,9 @@ const translateSingleMdToJa = async (filePath) => {
     )
     .flat();
 
+  // console.log(contentSegments);
+  // return;
+
   const dataArr = await Promise.all(
     contentSegments.map((seg) => {
       if (seg.skip) {
@@ -44,6 +47,8 @@ const translateSingleMdToJa = async (filePath) => {
       return executeLangLinkTranslator(seg.content);
     })
   );
+  // console.log(dataArr);
+  // return;
   const data = dataArr.join("\n").trim();
   const result = concatHeadings(data, headings);
   const contentWithMeta = `${meta}\n${result}`;
@@ -51,14 +56,14 @@ const translateSingleMdToJa = async (filePath) => {
   writeFileSync(`output/${filePath}`, contentWithMeta);
 };
 
-const metaReg = /---\s*\n/;
+const metaReg = /---\n/;
 
 const splitMetaContent = (originalText) => {
-  const [_, meta, content] = originalText.split(metaReg);
+  const [_, meta, ...content] = originalText.split(metaReg);
   if (!meta) {
     return [undefined, originalText];
   }
-  return [`---\n${meta}---\n`, content];
+  return [`---\n${meta}---\n`, content.join("---\n")];
 };
 
 const fromMarkdownContent = (content) =>
@@ -76,7 +81,7 @@ const toMarkdownContent = (astNode) =>
     extensions: [frontmatterToMarkdown(["yaml", "toml"]), gfmToMarkdown()],
   });
 
-const MAX_TOKEN = 2048;
+const MAX_TOKEN = 1024;
 const TIKTOKEN_ENCODING = "cl100k_base";
 
 const createSegment = (content, skip = false) => ({ content, skip });
@@ -103,6 +108,21 @@ const contentSplit = (content, by) => {
     segment.children = [];
   };
   root.children.forEach((node) => {
+    const tempSegment = createNewRoot();
+    tempSegment.children = [...segment.children, node];
+    const tempSegmentContent = toMarkdownContent(tempSegment);
+    const tempNumTokens = enc.encode(tempSegmentContent).length;
+    const willReachLimit = tempNumTokens > MAX_TOKEN;
+
+    if (
+      (node.type === by && !!segment.children.length && willReachLimit) ||
+      willReachLimit
+    ) {
+      pushSegmentContent();
+      segment.children.push(node);
+      return;
+    }
+
     if (skipTypes.includes(node.type)) {
       pushSegmentContent();
       // insert skip node into segments
@@ -110,10 +130,6 @@ const contentSplit = (content, by) => {
       newRoot.children.push(node);
       segments.push(createSegment(toMarkdownContent(newRoot), true));
       return;
-    }
-
-    if (node.type === by && !!segment.children.length) {
-      pushSegmentContent();
     }
 
     segment.children.push(node);
@@ -132,7 +148,7 @@ const extractHeadings = (content) => {
     .filter((node) => node.type === "heading")
     .map((node) => ({
       level: node.depth,
-      content: enStr2AnchorFormat(node.children[0].value),
+      content: enStr2AnchorFormat(toMarkdownContent(node)),
     }));
 };
 
@@ -141,6 +157,8 @@ const concatHeadings = (content, headings) => {
   const contentHeadings = root.children.filter(
     (node) => node.type === "heading"
   );
+  // console.log(headings.length);
+  // console.log(contentHeadings.length);
 
   headings.forEach((heading, index) => {
     const contentHeading = contentHeadings[index];
