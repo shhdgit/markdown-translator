@@ -39,26 +39,21 @@ const translateSingleMdToJa = async (filePath) => {
   // console.log(contentSegments);
   // return;
 
-  let contentWithMeta;
-  try {
-    const dataArr = await Promise.all(
-      contentSegments.map((seg) => {
-        if (seg.skip) {
-          return Promise.resolve(seg.content);
-        }
-        return executeLangLinkTranslator(seg.content);
-      })
-    );
-    // console.log(dataArr);
-    // return;
-    const data = dataArr.join("\n").trim();
-    const result = concatHeadings(data, headings);
-    contentWithMeta = `${meta}\n${result}`;
+  const dataArr = await Promise.all(
+    contentSegments.map((seg) => {
+      if (seg.skip) {
+        return Promise.resolve(seg.content);
+      }
+      return executeLangLinkTranslator(seg.content);
+    })
+  );
+  // console.log(dataArr);
+  // return;
+  const data = dataArr.join("\n").trim();
+  const result = concatHeadings(data, headings);
+  const contentWithMeta = `${meta}\n${result}`;
 
-    writeFileSync(`output/${filePath}`, contentWithMeta);
-  } catch (e) {
-    console.error(e);
-  }
+  writeFileSync(`output/${filePath}`, contentWithMeta);
 };
 
 const metaReg = /---\n/;
