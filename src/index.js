@@ -14,6 +14,7 @@ import { get_encoding } from "tiktoken";
 
 import { getMdFileList, writeFileSync } from "./lib.js";
 import { executeLangLinkTranslator } from "./openaiTranslate.js";
+import { gcpTranslator } from "./gcpTranslator.js";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -51,7 +52,7 @@ const translateSingleMdToJa = async (filePath) => {
   // return;
   const data = dataArr.join("\n").trim();
   const result = concatHeadings(data, headings);
-  const contentWithMeta = `${meta}\n${result}`;
+  const contentWithMeta = `${meta ? `${meta}\n` : ""}${result}`;
 
   writeFileSync(`output/${filePath}`, contentWithMeta);
 };
@@ -102,12 +103,24 @@ const contentSplit = (content, by) => {
     const numTokens = enc.encode(segmentContent).length;
     if (numTokens > MAX_TOKEN) {
       console.log(`Too large paragraph:\n${segmentContent.slice(0, 100)}...`);
+      throw new Error(
+        `Too large paragraph:\n${segmentContent.slice(0, 100)}...`
+      );
     }
 
     segments.push(createSegment(segmentContent, numTokens > MAX_TOKEN));
     segment.children = [];
   };
   root.children.forEach((node) => {
+    if (skipTypes.includes(node.type)) {
+      pushSegmentContent();
+      // insert skip node into segments
+      const newRoot = createNewRoot();
+      newRoot.children.push(node);
+      segments.push(createSegment(toMarkdownContent(newRoot), true));
+      return;
+    }
+
     const tempSegment = createNewRoot();
     tempSegment.children = [...segment.children, node];
     const tempSegmentContent = toMarkdownContent(tempSegment);
@@ -120,15 +133,6 @@ const contentSplit = (content, by) => {
     ) {
       pushSegmentContent();
       segment.children.push(node);
-      return;
-    }
-
-    if (skipTypes.includes(node.type)) {
-      pushSegmentContent();
-      // insert skip node into segments
-      const newRoot = createNewRoot();
-      newRoot.children.push(node);
-      segments.push(createSegment(toMarkdownContent(newRoot), true));
       return;
     }
 
@@ -199,7 +203,11 @@ const main = async () => {
   for (let filePath of srcList) {
     console.log(filePath);
     replaceDeprecatedContent(filePath);
-    await translateSingleMdToJa(filePath);
+    try {
+      await translateSingleMdToJa(filePath);
+    } catch {
+      await gcpTranslator(filePath);
+    }
   }
 
   // await Promise.all(
