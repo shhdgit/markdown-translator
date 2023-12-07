@@ -5,7 +5,7 @@ const LANGLINK_HEADERS = {
   "x-langlink-user": process.env.LANGLINK_USER,
 };
 
-const GPT35_APP_ID = "24fcccc8-f4a1-4e01-bc67-098398296613";
+const GPT35_APP_ID = "aa0b44bc-3306-427b-9349-27d33b53e255";
 const OUTPUT_NODE_ID = "uXt40e3y1KhhHEKW-gmSN";
 const RERUN_TIME = 3;
 const RETRY_INTERVAL = 5000;
@@ -71,7 +71,7 @@ const getLangLinkResult = async (id) => {
   );
   const data = await res.json();
   if (res.status !== 200) {
-    throw new Error(data);
+    throw new Error(JSON.stringify(data));
   }
   return data.debug;
 };

@@ -14,6 +14,7 @@ import { get_encoding } from "tiktoken";
 
 import { getMdFileList, writeFileSync } from "./lib.js";
 import { executeLangLinkTranslator } from "./openaiTranslate.js";
+import { gcpTranslator } from "./gcpTranslator.js";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -36,6 +37,9 @@ const translateSingleMdToJa = async (filePath) => {
     )
     .flat();
 
+  // console.log(contentSegments);
+  // return;
+
   const dataArr = await Promise.all(
     contentSegments.map((seg) => {
       if (seg.skip) {
@@ -44,18 +48,23 @@ const translateSingleMdToJa = async (filePath) => {
       return executeLangLinkTranslator(seg.content);
     })
   );
+  // console.log(dataArr);
+  // return;
   const data = dataArr.join("\n").trim();
   const result = concatHeadings(data, headings);
-  const contentWithMeta = `${meta}\n${result}`;
+  const contentWithMeta = `${meta ? `${meta}\n` : ""}${result}`;
 
   writeFileSync(`output/${filePath}`, contentWithMeta);
 };
 
-const metaReg = /---\s*\n/;
+const metaReg = /---\n/;
 
 const splitMetaContent = (originalText) => {
-  const [_, meta, content] = originalText.split(metaReg);
-  return [`---\n${meta}---\n`, content];
+  const [_, meta, ...content] = originalText.split(metaReg);
+  if (!meta) {
+    return [undefined, originalText];
+  }
+  return [`---\n${meta}---\n`, content.join("---\n")];
 };
 
 const fromMarkdownContent = (content) =>
@@ -79,7 +88,7 @@ const TIKTOKEN_ENCODING = "cl100k_base";
 const createSegment = (content, skip = false) => ({ content, skip });
 const skipTypes = ["code"];
 
-const contentSplit = (content) => {
+const contentSplit = (content, by) => {
   const enc = get_encoding(TIKTOKEN_ENCODING);
   const numTokens = enc.encode(content).length;
   if (numTokens < MAX_TOKEN) {
@@ -89,11 +98,22 @@ const contentSplit = (content) => {
   const root = fromMarkdownContent(content);
   const segments = [];
   let segment = createNewRoot();
+  const pushSegmentContent = () => {
+    const segmentContent = toMarkdownContent(segment);
+    const numTokens = enc.encode(segmentContent).length;
+    if (numTokens > MAX_TOKEN) {
+      console.log(`Too large paragraph:\n${segmentContent.slice(0, 100)}...`);
+      throw new Error(
+        `Too large paragraph:\n${segmentContent.slice(0, 100)}...`
+      );
+    }
+
+    segments.push(createSegment(segmentContent, numTokens > MAX_TOKEN));
+    segment.children = [];
+  };
   root.children.forEach((node) => {
     if (skipTypes.includes(node.type)) {
-      // clear segment
-      segments.push(createSegment(toMarkdownContent(segment)));
-      segment.children = [];
+      pushSegmentContent();
       // insert skip node into segments
       const newRoot = createNewRoot();
       newRoot.children.push(node);
@@ -101,50 +121,48 @@ const contentSplit = (content) => {
       return;
     }
 
-    const tempSeg = createNewRoot();
-    tempSeg.children = [...segment.children, node];
-    const tempContent = toMarkdownContent(tempSeg);
-    const numTokens = enc.encode(tempContent).length;
-    if (numTokens < MAX_TOKEN) {
+    const tempSegment = createNewRoot();
+    tempSegment.children = [...segment.children, node];
+    const tempSegmentContent = toMarkdownContent(tempSegment);
+    const tempNumTokens = enc.encode(tempSegmentContent).length;
+    const willReachLimit = tempNumTokens > MAX_TOKEN;
+
+    if (
+      (node.type === by && !!segment.children.length && willReachLimit) ||
+      willReachLimit
+    ) {
+      pushSegmentContent();
       segment.children.push(node);
       return;
     }
 
-    segments.push(createSegment(toMarkdownContent(segment)));
-    segment.children = [node];
+    segment.children.push(node);
   });
-  segments.push(createSegment(toMarkdownContent(segment)));
+
+  if (!!segment.children.length) {
+    pushSegmentContent();
+  }
 
   return segments;
 };
 
 const extractHeadings = (content) => {
-  const root = fromMarkdown(content, {
-    extensions: [frontmatter(["yaml", "toml"]), gfm()],
-    mdastExtensions: [
-      frontmatterFromMarkdown(["yaml", "toml"]),
-      gfmFromMarkdown(),
-    ],
-  });
+  const root = fromMarkdownContent(content);
   return root.children
     .filter((node) => node.type === "heading")
     .map((node) => ({
       level: node.depth,
-      content: enStr2AnchorFormat(node.children[0].value),
+      content: enStr2AnchorFormat(toMarkdownContent(node)),
     }));
 };
 
 const concatHeadings = (content, headings) => {
-  const root = fromMarkdown(content, {
-    extensions: [frontmatter(["yaml", "toml"]), gfm()],
-    mdastExtensions: [
-      frontmatterFromMarkdown(["yaml", "toml"]),
-      gfmFromMarkdown(),
-    ],
-  });
+  const root = fromMarkdownContent(content);
   const contentHeadings = root.children.filter(
     (node) => node.type === "heading"
   );
+  // console.log(headings.length);
+  // console.log(contentHeadings.length);
 
   headings.forEach((heading, index) => {
     const contentHeading = contentHeadings[index];
@@ -153,7 +171,10 @@ const concatHeadings = (content, headings) => {
         `The wrong level has been matched. Heading level: ${heading.level}, text: ${heading.content}; Content Heading level: ${contentHeading.depth}, text: ${contentHeading.children[0].value}`
       );
     }
-    contentHeading.children[0].value = `${contentHeading.children[0].value} {#${heading.content}}`;
+    contentHeading.children.push({
+      type: "text",
+      value: ` {#${heading.content}}`,
+    });
   });
 
   return toMarkdown(root, {
@@ -182,7 +203,11 @@ const main = async () => {
   for (let filePath of srcList) {
     console.log(filePath);
     replaceDeprecatedContent(filePath);
-    await translateSingleMdToJa(filePath);
+    try {
+      await translateSingleMdToJa(filePath);
+    } catch {
+      await gcpTranslator(filePath);
+    }
   }
 
   // await Promise.all(
